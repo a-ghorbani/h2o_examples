@@ -1,0 +1,142 @@
+---
+title: "GLRM"
+author: "A. Ghorbani"
+date: "April 24, 2016"
+output: html_document
+---
+
+## Load required packages
+```{r message=FALSE, warning=FALSE}
+require(h2o)
+require(lattice)
+require(gridExtra)
+
+h2o.init()
+```
+
+## Initiate problem parameters
+```{r message=FALSE, warning=FALSE}
+k  <- 10   # Low rank
+n1 <- 40   # number of numerical columns
+n2 <- 30   # number of ordinal columns
+n3 <- 30   # number of binary columns
+n <- n1+n2+n3 # number of columns
+m <- 100  # number of rows
+```
+
+## Create low-rank matrix
+```{r message=FALSE, warning=FALSE}
+#=============================================================
+# Initialize low dimentional matrix
+#=============================================================
+X <- rnorm(m*k)
+dim(X) <- c(m,k)
+
+#=============================================================
+# Initialize archetype matrix
+#=============================================================
+Y <- rnorm(k*n)
+dim(Y) <- c(k,n)
+
+#=============================================================
+# High dimentional (low-ranked) matrix
+#=============================================================
+data <- X %*% Y
+data <- as.data.frame(data)
+```
+
+## Apply data types and missing value
+```{r message=FALSE, warning=FALSE}
+c.num  <- c(1:n1)           # numerical columns indices
+c.ord  <- c((n1+1):(n1+n2)) # categorical columns indices
+c.bin  <- c((n1+n2+1):n)    # binary columns indices
+
+#=============================================================
+# Convert to categorical
+# 1,2 ... 7
+#=============================================================
+tmp <- data[,c.ord]
+tmp <- round((tmp - min(tmp)) / (max(tmp) - min(tmp)) * 6 + 1)
+data[,c.ord] <- tmp
+data[,c.ord] <- as.data.frame(lapply(data[,c.ord], as.factor))
+
+#=============================================================
+# Convert to boolean
+# 0, 1
+#=============================================================
+data[,c.bin] <- ( sign(data[,c.bin]) + 1 ) / 2  
+
+#=============================================================
+# Make part of data missing 
+#=============================================================
+r.na <- c(40:50)
+c.na <- c((n1-3):(n-10))
+data[r.na,c.na] <- NA
+```
+
+## Fit GLRM model
+```{r message=FALSE, warning=FALSE, message=FALSE}
+#=============================================================
+# Upload data into H2O 
+#=============================================================
+data_df  <- as.h2o(data,  destination_frame = "data_df")
+
+#=============================================================
+# Fit GLRM model 
+#=============================================================
+glrm.fit <- h2o.glrm(
+  training_frame    = data_df, 
+  validation_frame  = data_df,
+  k                 = k, 
+  ignore_const_cols = FALSE,
+  loss              = "Quadratic",
+  multi_loss        = "Categorical", 
+  loss_by_col       = c(rep("Hinge",n3)),
+  loss_by_col_idx   = c(c.bin)-1,
+  regularization_x  = "Quadratic",
+  regularization_y  = "Quadratic",
+  gamma_x           = 0.01,
+  gamma_y           = 0.01
+  )
+
+#=============================================================
+# h2o.predict will reconstructs data 
+#=============================================================
+glrm.reconst <- h2o.predict(glrm.fit, data_df)
+```
+
+## Plot original vs reconstructed data
+```{r message=FALSE, warning=FALSE, fig.width=12, fig.height=13, dpi=150}
+
+p1 <- levelplot(
+        x           = t(data), 
+        xlab        = "", 
+        ylab        = "", 
+        main        = "Original data", 
+        colorkey    = NULL, #list(at=seq(from=-10,to=10,length=11)),
+        at          = seq(from=-10,to=10,length=11), 
+        scales      = list(draw = FALSE),
+        col.regions = rainbow(11))
+p2 <- levelplot(
+        x           = t(as.data.frame(h2o.getFrame(glrm.fit@model$representation_name))), 
+        xlab        = "", 
+        ylab        = "", 
+        main        = "Low dim. rep.", 
+        colorkey    = NULL, #list(at=seq(from=-10,to=10,length=11)),
+        at          = seq(from=-10,to=10,length=11), 
+        scales      = list(draw = FALSE),
+        col.regions = rainbow(11))
+p3 <- levelplot(
+        x           = t(as.data.frame(glrm.reconst)), 
+        xlab        = "", 
+        ylab        = "", 
+        main        = "Reconstructed matrix", 
+        colorkey    = NULL, #list(at=seq(from=-10,to=10,length=11)),
+        at          = seq(from=-10,to=10,length=11), 
+        scales      = list(draw = FALSE),
+        col.regions = rainbow(11))
+# print(p1, position = c(0,   0, 0.5, 1), more = TRUE)
+# print(p2, position = c(0.5, 0,   1, 1))
+grid.arrange(p1,p2,p3, ncol=3, heights = c(2,2,2)) #, widths = c())
+```
+
