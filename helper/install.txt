@@ -1,0 +1,11 @@
+
+# for Python
+sh$> python -m pip install --upgrade h2o-3.9.1.3458/python/h2o-3.9.1.3458-py2.py3-none-any.whl 
+
+
+# for R
+install.packages("statmod")
+install.packages("RCurl")
+install.packages("jsonlite")
+install.packages("h2o-3.9.1.3458/R/h2o_3.9.1.3458.tar.gz", repos=NULL, type = "source")
+

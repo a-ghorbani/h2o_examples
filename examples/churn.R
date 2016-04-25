@@ -3,8 +3,9 @@
 # Load required packages
 #=============================================================
 require(readr)
+require(ggplot2)
 require(h2o)
-# h2o.removeAll()
+h2o.removeAll()
 
 #=============================================================
 # Env. config.
@@ -16,9 +17,9 @@ Sys.setenv(HTTP_PROXY="")  # if proxy was set
 #=============================================================
 # Init H2O (connect to a running H2O cluster)
 #=============================================================
-h2o.init(port = 54321,
+h2o.init(port = 54324,
          username = "aghorbani", 
-         password = "aghorbani",  
+         password = Sys.getenv("h2oPass"),  
          startH2O = FALSE)
 
 #=============================================================
@@ -139,7 +140,6 @@ scoring_history <- rbind(scoring_history,shist)
 scoring_history$duration <- as.numeric(
   gsub("sec", "", scoring_history$duration))
 
-require(ggplot2)
 ggplot(data = scoring_history, 
        aes(x     = duration, 
            y     = validation_MSE, 
