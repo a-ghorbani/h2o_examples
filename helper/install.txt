@@ -9,3 +9,6 @@ install.packages("RCurl")
 install.packages("jsonlite")
 install.packages("h2o-3.9.1.3458/R/h2o_3.9.1.3458.tar.gz", repos=NULL, type = "source")
 
+# h2oEnsemble
+library(devtools)
+install_github("h2oai/h2o-3/h2o-r/ensemble/h2oEnsemble-package")

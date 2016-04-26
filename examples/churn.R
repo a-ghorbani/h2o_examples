@@ -5,7 +5,6 @@
 require(readr)
 require(ggplot2)
 require(h2o)
-h2o.removeAll()
 
 #=============================================================
 # Env. config.
@@ -22,11 +21,13 @@ h2o.init(port = 54324,
          password = Sys.getenv("h2oPass"),  
          startH2O = FALSE)
 
+#h2o.removeAll()
+
 #=============================================================
 # Load data
 #=============================================================
 # setwd("E:/Users/aghorbani/Documents/presentation/h2o")
-setwd("~/github/H2O/examples/")
+setwd("~/github/notebooks/H2O/examples/")
 data  <- read_csv("data/attrition.csv")
 
 #=============================================================
