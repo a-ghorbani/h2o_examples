@@ -64,7 +64,7 @@ y <- "Churn"
 x <- setdiff(names(data_frame), 
              c(y,"CustID"))
 #========================
-# Logistic Regression
+#  Logistic regression
 #========================
 glm <- h2o.glm(
   x                = x,
@@ -92,6 +92,7 @@ gbm <- h2o.gbm(
   col_sample_rate  = 0.7,
   model_id         = "yooHoo_my_awesome_GBM")
 
+plot(gbm, metric="MSE")
 #========================
 # distributed random forest
 #========================
@@ -102,6 +103,7 @@ drf <- h2o.randomForest(
   validation_frame = valid_frame,
   model_id         = "yooHoo_my_awesome_drf")
 
+plot(drf, metric="MSE")
 #========================
 # deeplearning
 #========================
@@ -118,7 +120,7 @@ dl <- h2o.deeplearning(
   score_interval        = 0.0001,
   model_id              = "yooHoo_my_awesome_dl")
 
-
+plot(dl, metric="MSE")
 #========================
 # Plot AUC
 #========================
