@@ -45,7 +45,6 @@ as.data.frame.H2OFrame <- function(x, ...) {
   # Versions of R including 3.1 and later should use hex string.
   
   use_hex_string <- getRversion() >= "3.1"
-  conn = h2o.getConnection()
   
   urlSuffix <- .h2o.__DOWNLOAD_FRAME(h2o.getId(x), use_hex_string)
   
