@@ -30,24 +30,26 @@ as.data.frame(h2o_df)
 # The code is a copy pase from 
 # https://github.com/h2oai/h2o-3/blob/master/h2o-r/h2o-package/R/frame.R#L2146
 # + the fix
+#=================================================
+# FIX
+#=================================================
+.h2o.__DOWNLOAD_FRAME <- function(frame_id, use_hex_string) {
+  paste0('DownloadDataset?frame_id=', URLencode(frame_id), 
+         '&hex_string=', as.numeric(use_hex_string))
+}
+
 as.data.frame.H2OFrame <- function(x, ...) {
   # Force loading of the types
   h2o:::.fetch.data(x,1L)
   # Versions of R prior to 3.1 should not use hex string.
   # Versions of R including 3.1 and later should use hex string.
+  
   use_hex_string <- getRversion() >= "3.1"
   conn = h2o.getConnection()
   
-  url <- paste0('http://', conn@ip, ':', conn@port,
-                '/3/DownloadDataset',
-                '?frame_id=', URLencode( h2o.getId(x)),
-                '&hex_string=', as.numeric(use_hex_string))
+  urlSuffix <- .h2o.__DOWNLOAD_FRAME(h2o.getId(x), use_hex_string)
   
-  if(is.null(conn@username)){
-    ttt <- getURL(url)
-  }else{
-    ttt <- getURL(url, userpwd=paste0(conn@username,':',conn@password), httpauth = 1L)
-  }
+  ttt <- h2o:::.h2o.doSafeGET(urlSuffix = urlSuffix)
   
   n <- nchar(ttt)
   
