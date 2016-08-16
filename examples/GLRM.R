@@ -6,7 +6,12 @@ require(h2o)
 require(lattice)
 
 h2o.init()
-h2o.removeAll()
+#port = 54324,
+#         username = "aghorbani", 
+#         password = Sys.getenv("h2oPass"),  
+ #        startH2O = FALSE)
+
+#h2o.removeAll()
 #=============================================================
 # Initiate problem parameters
 #=============================================================

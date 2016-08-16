@@ -12,6 +12,10 @@ require(lattice)
 require(gridExtra)
 
 h2o.init()
+# h2o.init(port = 54324,
+#          username = "aghorbani", 
+#          password = Sys.getenv("h2oPass"),  
+#          startH2O = FALSE)
 ```
 
 ## Initiate problem parameters
@@ -39,7 +43,7 @@ Y <- rnorm(k*n)
 dim(Y) <- c(k,n)
 
 #=============================================================
-# High dimentional (low-ranked) matrix
+# High dimentional (low-rank) matrix
 #=============================================================
 data <- X %*% Y
 data <- as.data.frame(data)

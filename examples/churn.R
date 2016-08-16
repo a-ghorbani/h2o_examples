@@ -3,8 +3,8 @@
 # Load required packages
 #=============================================================
 require(readr)
+require(ggplot2)
 require(h2o)
-# h2o.removeAll()
 
 #=============================================================
 # Env. config.
@@ -16,16 +16,18 @@ Sys.setenv(HTTP_PROXY="")  # if proxy was set
 #=============================================================
 # Init H2O (connect to a running H2O cluster)
 #=============================================================
-h2o.init(port = 54321,
+h2o.init(port = 54324,
          username = "aghorbani", 
-         password = "aghorbani",  
+         password = Sys.getenv("h2oPass"),  
          startH2O = FALSE)
+
+#h2o.removeAll()
 
 #=============================================================
 # Load data
 #=============================================================
 # setwd("E:/Users/aghorbani/Documents/presentation/h2o")
-setwd("~/github/H2O/examples/")
+setwd("~/github/notebooks/H2O/examples/")
 data  <- read_csv("data/attrition.csv")
 
 #=============================================================
@@ -62,7 +64,7 @@ y <- "Churn"
 x <- setdiff(names(data_frame), 
              c(y,"CustID"))
 #========================
-# Logistic Regression
+#  Logistic regression
 #========================
 glm <- h2o.glm(
   x                = x,
@@ -90,6 +92,7 @@ gbm <- h2o.gbm(
   col_sample_rate  = 0.7,
   model_id         = "yooHoo_my_awesome_GBM")
 
+plot(gbm, metric="MSE")
 #========================
 # distributed random forest
 #========================
@@ -100,6 +103,7 @@ drf <- h2o.randomForest(
   validation_frame = valid_frame,
   model_id         = "yooHoo_my_awesome_drf")
 
+plot(drf, metric="MSE")
 #========================
 # deeplearning
 #========================
@@ -116,7 +120,7 @@ dl <- h2o.deeplearning(
   score_interval        = 0.0001,
   model_id              = "yooHoo_my_awesome_dl")
 
-
+plot(dl, metric="MSE")
 #========================
 # Plot AUC
 #========================
@@ -139,7 +143,6 @@ scoring_history <- rbind(scoring_history,shist)
 scoring_history$duration <- as.numeric(
   gsub("sec", "", scoring_history$duration))
 
-require(ggplot2)
 ggplot(data = scoring_history, 
        aes(x     = duration, 
            y     = validation_MSE, 
