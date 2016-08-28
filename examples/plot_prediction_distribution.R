@@ -1,10 +1,10 @@
 
-plot_prediction_distribution <- function(probs, trueVals, threshold) {
+plot_prediction_distribution <- function(probs, truth, threshold) {
   # Plots the prediction distribution.
   #
   # Args:
   #   probs: The predicted probabilities.
-  #   trueVals: The true values of the target variable (either 0 or 1).
+  #   truth: The true values of the target variable (either 0 or 1).
   #   threshold: Threshold for prediction.
   #
   # Returns:
