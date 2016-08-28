@@ -1,19 +1,16 @@
 
-plot_prediction_distribution <- function(df, probCol, targetCol, threshold) {
+plot_prediction_distribution <- function(probs, trueVals, threshold) {
   # Plots the prediction distribution.
   #
   # Args:
-  #   df: A data frame contains prediction of the probabilities and the true,
-  #       target values.
-  #   probCol: Column name of the predicted probabilities.
-  #   targetCol: The true values of the target variable.
+  #   probs: The predicted probabilities.
+  #   trueVals: The true values of the target variable (either 0 or 1).
   #   threshold: Threshold for prediction.
   #
   # Returns:
   #   A ggplot object.
   
-  df$truth  <- df[, targetCol]  
-  df$p1     <- df[, probCol]
+  df <- data.frame(truth = truth, p1 = probs)
   
   v <- rep(NA, nrow(df))
   v <- ifelse(df$p1 >= threshold & df$truth == 1, "TP", v)
