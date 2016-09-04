@@ -6,6 +6,7 @@ library(RColorBrewer)
 library(partykit)
 library(caret)
 library(party)
+library(rBayesianOptimization)
 
 #=============================================================
 # Load required packages
@@ -65,6 +66,67 @@ x <- setdiff(names(data_frame),  c(y))
 #========================
 #glrm <- h2o.glrm(train_frame, c(y,x), )
 
+#========================
+# Parameter Tuning
+#========================
+h2o_bayes <- function(
+  max_depth, learn_rate, sample_rate, 
+  col_sample_rate, balance_classes){
+  bal.cl <- as.logical(balance_classes)
+  gbm <- h2o.gbm(
+    x                = x,
+    y                = y,
+    training_frame   = train_frame,
+    #validation_frame = valid_frame,
+    nfolds           = 5,
+    ntrees           = 900,
+    max_depth        = max_depth,
+    learn_rate       = learn_rate,
+    sample_rate      = sample_rate,
+    col_sample_rate  = col_sample_rate,
+    stopping_rounds  = 10,
+    stopping_metric  = "logloss",
+    stopping_tolerance = 0.005,
+    balance_classes  = bal.cl)
+    
+  list(Score = gbm@model$cross_validation_metrics@metrics$AUC,
+       Pred  = gbm@model$cross_validation_predictions)
+}
+
+OPT_Res <- BayesianOptimization(
+  h2o_bayes,
+  bounds = list(
+    max_depth   = c(2L, 8L), 
+    learn_rate  = c(0, 0.2),
+    sample_rate = c(0.4, 1), 
+    col_sample_rate = c(0.4, 1), 
+    balance_classes = c(0L, 1L)),
+  init_points = 10,  n_iter = 20,
+  acq = "ucb", kappa = 2.576, eps = 0.0,
+  verbose = TRUE)
+
+OPT_Res2 <- BayesianOptimization(
+  h2o_bayes,
+  bounds = list(
+    max_depth   = c(2L, 8L), 
+    learn_rate  = c(0, 0.2),
+    sample_rate = c(0.4, 1), 
+    col_sample_rate = c(0.4, 1), 
+    balance_classes = c(0L, 1L)),
+  init_points = 10,  n_iter = 20,
+  acq = "ei", kappa = 2.576, eps = 0.0,
+  verbose = TRUE)
+OPT_Res3 <- BayesianOptimization(
+  h2o_bayes,
+  bounds = list(
+    max_depth   = c(2L, 8L), 
+    learn_rate  = c(0, 0.2),
+    sample_rate = c(0.4, 1), 
+    col_sample_rate = c(0.4, 1), 
+    balance_classes = c(0L, 1L)),
+  init_points = 10,  n_iter = 20,
+  acq = "poi", kappa = 2.576, eps = 0.0,
+  verbose = TRUE)
 #========================
 # Gradient boosting machine
 #========================
