@@ -92,11 +92,12 @@ Let's have a look at the data:
 library(knitr)
 
 tmp.df <- data.frame(a = c(1:4), b = c(1:4))
+
 kable(data_frame[1:5,], digits=2)
 
-kable(h2o.summary(data_frame), digits=2)
+#kable(h2o.summary(data_frame), digits=2)
 
-kable(h2o.describe(data_frame), digits = 2)
+#kable(h2o.describe(data_frame), digits = 2)
 ```
 
 The column `Churn?` specifies whther the customer has left the plan or not yet.
@@ -164,7 +165,7 @@ h2o_bayes <- function(
     y                   = y,
     training_frame      = train_frame,
     validation_frame    = valid_frame,
-    nfolds              = 3,
+    #nfolds              = 3,
     ntrees              = 900,
     max_depth           = max_depth,
     learn_rate          = learn_rate,
@@ -230,8 +231,7 @@ Hence, I will train a model with only important variables that I have optained f
 
 ```{r, message=FALSE, warning=FALSE}
 
-var.imp <- gbm@model$variable_importances$variable[
-  gbm@model$variable_importances$scaled_importance > 0.01]
+var.imp <- h2o.varimp(gbm)[h2o.varimp(gbm)$scaled_importance > 0.01, "variable"]
 # The value of 0.01 is arbitrary, you might want to use other values.
 
 gbm_varImp <- h2o.gbm(
@@ -306,11 +306,13 @@ perfDF <- melt(as.data.frame(bestPerf@metrics$thresholds_and_metric_scores),
 ```
 
 Performace of the model on the test data:
-```{r, message=FALSE, warning=FALSE, kable}
+```{r, message=FALSE, warning=FALSE, kable2}
+
 kable(
   as.data.frame(
     bestPerf@metrics[c("MSE", "RMSE", "AUC", "r2", "logloss", "Gini", "mean_per_class_error")]), 
   digits = 3)
+
 ```
 
 As you know the prediction of the model is a probability of a customer is going to leave or not.
@@ -337,12 +339,14 @@ We would like to have all data points be either in top right (True Positive (TP)
 So, which customer is going to leave?
 If the prediction value is more than 0.5? well it depends on our criteria.
 Here are some of the critera and the maximum value we can get depending on which criteria we choose for the probability: 
-```{r, message=FALSE, warning=FALSE, kable}
+```{r, message=FALSE, warning=FALSE, kable3}
+
 kable(bestPerf@metrics$max_criteria_and_metric_scores, digits = 3)
+
 ```
 
 and here is plots of few of them.
-```{r, message=FALSE, warning=FALSE, kable}
+```{r, message=FALSE, warning=FALSE, kable4}
 scores_to_plot <- c("accuracy", "precision", "recall", "min_per_class_accuracy")
 
 ggplot(data = perfDF[perfDF$variable %in% scores_to_plot, ],  
@@ -353,6 +357,7 @@ ggplot(data = perfDF[perfDF$variable %in% scores_to_plot, ],
   geom_line() + geom_point() 
 
 kable(bestPerf@metrics, digits = 3)
+
 ```
 
 depending on which criteria is more important in the context of bussiness. Or even if we know the accual costs of false possitives and false negatives (or benefits of true pasitives) we can have better decision on which criteria to choose.
@@ -369,16 +374,33 @@ But we would like to have some more insights and be able to answer questions lik
 
 In many situations not all the co-variables are equaly important. Some varaiable are more important that the others. Using variable importance we can focus more on them. 
 ```{r}
-df  <- as.data.frame(bestModel@model$variable_importances)[, c("variable","scaled_importance")]
-df$variable <- reorder(df$variable,df$scaled_importance)
+# df  <- as.data.frame(bestModel@model$variable_importances)[, c("variable","scaled_importance")]
+# df$variable <- reorder(df$variable,df$scaled_importance)
+# 
+# ggplot(data = df, aes(x = variable, y = scaled_importance)) +  
+#   geom_bar(stat="identity") +
+#   coord_flip()
 
-ggplot(data = df, aes(x = variable, y = scaled_importance)) +  
-  geom_bar(stat="identity") +
-  coord_flip()
+h2o.varimp_plot(bestModel)
+
 ```
 ## Variable Importance per Customer
+```{r message=FALSE, warning=FALSE}
+require(Rcpp)
+Rcpp::sourceCpp("get_high_rank_values.cpp")
+source("rowVarImp.R")
+
+df <- rowVarImp.h2o(model=bestModel, cols=var.imp, data_frame=test_frame, n=5)
+
+kable(df)
+
+```
 
 ## Partial Dependence Plots 
+```{r message=FALSE, warning=FALSE}
+
+```
+
 ## A Simplified Single Decision Tree
 
 ```{r}
