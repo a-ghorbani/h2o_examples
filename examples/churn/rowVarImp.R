@@ -45,10 +45,10 @@ rowVarImp.h2o  <-
     res <- cbind(l[[1]], l[[2]], l[[3]])
     
     # give appropriate name to each column
-    colNameC <-  paste0("CUST_VARIMP_C", c(1:n))
-    colNameR <-  paste0("CUST_VARIMP_R", c(1:n))
-    colNameV <-  paste0("CUST_VARIMP_V", c(1:n))
-    colnames(res) <- c(colNameC, colNameR, colNameV)
+    colNameC <-  paste0("colName_VI", c(1:n))
+    colNameR <-  paste0("imp_VI", c(1:n))
+    colNameV <-  paste0("value_VI", c(1:n))
+    colnames(res) <- c(colNameR, colNameV, colNameC)
     
     return(res)
   } 

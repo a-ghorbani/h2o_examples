@@ -30,7 +30,7 @@ Here we use the data from  [http://www.dataminingconsultant.com/data/churn.txt](
 The description of the columns can be found [here](http://www.sgi.com/tech/mlc/db/churn.names).
 
 # Load the required packages
-```{r, message=FALSE, warning=FALSE}
+```{r, message=FALSE, warning=FALSE, results='hide'}
 #=========================================
 # TODO: remove unnecessary packages
 #=========================================
@@ -46,6 +46,7 @@ require(readr)
 require(data.table)
 require(reshape2)
 library(pROC)
+require(ggplot2)
 
 require(h2o)
   
@@ -78,7 +79,7 @@ h2o.removeAll()
 
 # Load the data into h2o
 
-```{r, message=FALSE, warning=FALSE}
+```{r, message=FALSE, warning=FALSE, results='hide'}
 data_frame <- 
   h2o.importFile(
     path              = "http://www.dataminingconsultant.com/data/churn.txt",
@@ -177,8 +178,9 @@ h2o_bayes <- function(
     stopping_tolerance  = 0.005,
     balance_classes     = bal.cl)
     
-  list(Score = gbm@model$cross_validation_metrics@metrics$AUC,
-       Pred  = gbm@model$cross_validation_predictions)
+  score <- h2o.auc(gbm, valid = T)
+  list(Score = score,
+       Pred  = 0)
 }
 
 #============================
@@ -201,7 +203,7 @@ OPT_Res <- BayesianOptimization(
 ## Building the model using optimal parameters
 
 After searching for the best parameters using Bayesian optimisation algorithm, we use the values found above to train a GBM model.
-```{r, message=FALSE, warning=FALSE}
+```{r, message=FALSE, warning=FALSE, results='hide'}
 gbm <- h2o.gbm(
   x                   = x,
   y                   = y,
@@ -229,7 +231,7 @@ Even if doesn't improve the result, it will reduce the amount of resources neede
 
 Hence, I will train a model with only important variables that I have optained from previoius calculation.
 
-```{r, message=FALSE, warning=FALSE}
+```{r, message=FALSE, warning=FALSE, results='hide'}
 
 var.imp <- h2o.varimp(gbm)[h2o.varimp(gbm)$scaled_importance > 0.01, "variable"]
 # The value of 0.01 is arbitrary, you might want to use other values.
@@ -318,7 +320,7 @@ kable(
 As you know the prediction of the model is a probability of a customer is going to leave or not.
 
 Lets have a look at the prediction distribution:
-```{r, message=FALSE, warning=FALSE, echo=FALSE}
+```{r, message=FALSE, warning=FALSE, echo=FALSE, results='hide'}
 pred <- h2o.predict(bestModel, test_frame)
 pred.df <- as.data.frame(h2o.cbind(test_frame[, y], pred))
 
@@ -327,11 +329,15 @@ best_acc_thresh <- score_table[score_table$metric == "max accuracy", "threshold"
 
 source("https://raw.githubusercontent.com/a-ghorbani/notebooks/master/H2O/examples/plot_prediction_distribution.R")
 
-plot_prediction_distribution( 
+p <- plot_prediction_distribution( 
   probs = pred.df$True.,
   truth = as.factor(as.numeric(pred.df$Churn. == "True.")),
   threshold = best_acc_thresh)
   
+```
+
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
+p
 ```
 
 We would like to have all data points be either in top right (True Positive (TP)) or buttom left (True Negative (TN)).
@@ -356,7 +362,7 @@ ggplot(data = perfDF[perfDF$variable %in% scores_to_plot, ],
            group = variable)) + 
   geom_line() + geom_point() 
 
-kable(bestPerf@metrics, digits = 3)
+#kable(bestPerf@metrics, digits = 3)
 
 ```
 
@@ -384,15 +390,23 @@ In many situations not all the co-variables are equaly important. Some varaiable
 h2o.varimp_plot(bestModel)
 
 ```
+
 ## Variable Importance per Customer
-```{r message=FALSE, warning=FALSE}
+
+```{r message=FALSE, warning=FALSE, results='hide'}
 require(Rcpp)
 Rcpp::sourceCpp("get_high_rank_values.cpp")
-source("rowVarImp.R")
+source("https://raw.githubusercontent.com/a-ghorbani/notebooks/master/H2O/examples/churn/rowVarImp.R")
 
-df <- rowVarImp.h2o(model=bestModel, cols=var.imp, data_frame=test_frame, n=5)
+df <- rowVarImp.h2o(model=bestModel, cols=var.imp, data_frame=test_frame, n=3)
 
-kable(df)
+```
+
+```{r message=FALSE, warning=FALSE}
+kable(
+  head(df),
+  digits=3
+)
 
 ```
 
@@ -403,7 +417,7 @@ kable(df)
 
 ## A Simplified Single Decision Tree
 
-```{r}
+```{r message=FALSE, warning=FALSE, results='hide'}
 denoise.h2o.df <- function(model, data_frame, destination_frame, lower.q=0.2, higher.q=0.8){
   # Removes the data points that cannot be classified significantly.
   # That means the data points for which the prediction is far away from 0 and 1, 
@@ -478,8 +492,7 @@ id <- which(!(test_df$State %in% levels(train_df$State)))
 test_df$State[id] <- NA
 
 Pred1 <- predict(tree, test_df)
-test_df$Prediction1 <- Pred1
-test_df$truth1 <- as.numeric(test_df$Churn. == "True.")
+test_df$Prediction1 <- Pred1[,"True."]
 ROC1 <- roc(test_df$Churn., test_df$Prediction1)
-
+ROC1$auc
 ```
