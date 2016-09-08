@@ -414,10 +414,28 @@ kable(
 ```{r message=FALSE, warning=FALSE, results='hide'}
 source("https://raw.githubusercontent.com/a-ghorbani/notebooks/master/H2O/examples/churn/partialDependencePlot.R")
 
-cols <- c("State", "Day Charge")
-pdp1 <- partialDependencePlot(gbm, cols, data_frame)
+cols <- var.imp[1:5]
+pdps <- lapply(cols, function(x) partialDependencePlot(bestModel, x, data_frame) )
 
-pdp2 <- partialDependencePlot(gbm, "Day Charge", data_frame)
+lapply(1:length(cols), function(x){
+  x_ <- melt(pdps[[x]])
+  colnames(x_) <- c("variable", "diff")
+  p <- ggplot(data = x_, aes(x = variable, y = diff))  
+  if(class(x_$variable) == 'factor'){
+    p <- p + geom_bar(stat="identity")
+  }else{
+    p <- p + geom_line()
+  }
+  p + ggtitle(cols[x])
+})
+
+```
+
+```{r message=FALSE, warning=FALSE, results='hide'}
+cols <- c("State", "Day Charge")
+pdp1 <- partialDependencePlot(bestModel, cols, data_frame)
+
+pdp2 <- partialDependencePlot(bestModel, "Day Charge", data_frame)
 
 pdp1 <- melt(pdp1)
 pdp2 <- melt(pdp2)
