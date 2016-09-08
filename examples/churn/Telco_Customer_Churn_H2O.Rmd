@@ -411,8 +411,31 @@ kable(
 ```
 
 ## Partial Dependence Plots 
-```{r message=FALSE, warning=FALSE}
+```{r message=FALSE, warning=FALSE, results='hide'}
+source("https://raw.githubusercontent.com/a-ghorbani/notebooks/master/H2O/examples/churn/partialDependencePlot.R")
 
+cols <- c("State", "Day Charge")
+pdp1 <- partialDependencePlot(gbm, cols, data_frame)
+
+pdp2 <- partialDependencePlot(gbm, "Day Charge", data_frame)
+
+pdp1 <- melt(pdp1)
+pdp2 <- melt(pdp2)
+pdp2$State <- "AVG"
+
+colnames(pdp1) <- c("State", "Day.Charge", "diff")
+colnames(pdp2) <- c("Day.Charge", "diff", "State")
+
+```
+
+```{r message=FALSE, warning=FALSE}
+ggplot(data = pdp1, 
+       aes(x     = Day.Charge, 
+           y     = diff,   
+           color = State,
+           group = State)) + 
+  geom_line() +
+  geom_line(data = pdp2, size=3, color='black')
 ```
 
 ## A Simplified Single Decision Tree
