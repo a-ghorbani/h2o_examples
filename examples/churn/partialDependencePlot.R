@@ -20,7 +20,8 @@ partialDependencePlot <- function(model, cols, data_frame, N=20, values = NULL){
       if(type == "enum" | type == "string"){
         #vals = as.data.frame(h2o.unique(data_frame[,col]))
         tab <- as.data.frame(h2o.table(data_frame[,col]))
-        vals <- as.character(tab[order(tab$Count, decreasing = T),][c(1:N),col])
+        n <- min(N,nrow(tab))
+        vals <- as.character(tab[order(tab$Count, decreasing = T),][c(1:n),1])
       }else if(type == "int" | type == "real"){
         minVal <- min(data_frame[,col], na.rm=TRUE)
         maxVal <- max(data_frame[,col], na.rm=TRUE)
