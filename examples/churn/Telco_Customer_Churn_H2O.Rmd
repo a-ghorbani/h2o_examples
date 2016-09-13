@@ -449,11 +449,14 @@ pdps <- lapply(cols, function(x) partialDependencePlot(bestModel, x, data_frame)
 lapply(1:length(cols), function(x){
   x_ <- melt(pdps[[x]])
   colnames(x_) <- c("variable", "diff")
-  p <- ggplot(data = x_, aes(x = variable, y = diff))  
   if(class(x_$variable) == 'factor'){
-    p <- p + geom_bar(stat="identity")
+    # order based on diff
+    x_ <- within(x_, variable <- factor(variable, levels=variable[order(-diff)]))
+    p <- ggplot(data = x_, aes(x = variable, y = diff)) +
+      geom_bar(stat="identity" )
   }else{
-    p <- p + geom_line()
+    p <- ggplot(data = x_, aes(x = variable, y = diff)) +
+      geom_line()
   }
   p + ggtitle(cols[x])
 })
