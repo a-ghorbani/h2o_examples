@@ -7,7 +7,7 @@ output: html_document
 bibliography: bibliography.bib
 ---
 
-A data science example using H2O ([h2o.ai](http://h2o.ai)) to investigating a classification problem, namely customer churn.
+A data science example using H2O ([h2o.ai](http://h2o.ai)) to investigate a classification problem, namely customer churn.
 
 # Introduction
 
@@ -108,25 +108,27 @@ library(knitr)
 tmp.df <- data.frame(a = c(1:4), b = c(1:4))
 
 kable(data_frame[1:5,], digits=2 )
+```
 
+We can use `h2o.describe` to obtain some basic statistics about the variables, like mean, min, max, number of missing values, etc.
+```{r, message=FALSE, warning=FALSE}
 #kable(h2o.summary(data_frame, exact_quantiles = TRUE),  digits=2)
 
 kable(h2o.describe(data_frame), digits = 2)
 ```
 
-NOTE: The function `kable()` is used just to have s nice table in the output.
+NOTE: The function `kable()` is used just to have a nice table in the output.
 
 The column `Churn?` specifies whether the customer has left the plan or not.
 For exact meaning of other columns see [here](http://www.sgi.com/tech/mlc/db/churn.names).
 
 In order to build and assess the model we are going to split the data into *training*, *validation* and *testing* data set.
-I assume that we the analysis here is applied to a large data set.
-It is not true in this example, we have only `r nrow(data_frame)` number of rows, which is not that big.
-In such case it is better to split the data set into only training and testing. For model selection and hyper-parameter tuning cross-validation can be used then. 
+I assume that the analysis here is applied to a large data set.
+It is not true in this example, though, since we have only `r nrow(data_frame)` number of rows, which is not that big.
+In such case it is better to split the data set into only training and testing. And for model selection and hyper-parameter tuning using cross-validation. 
 
-Since, I assume the example here will be used for a very large data set.
-Otherwise why somebody wants to use H2O ;). 
-I will split the data set into training, validation and testing data set with ratio of %50, %25 and %25, respectively.
+Since, I assume the example here will be used for a very large data set, otherwise why somebody wants to use H2O ;),
+the data set is split into training, validation and testing with ratio of %50, %25 and %25, respectively.
 
 ```{r, message=FALSE, warning=FALSE}
 split_df  <- 
@@ -151,16 +153,17 @@ x <- setdiff(names(data_frame),  c(y))
 ```
 
 
-## Bayian Optimization
+## Bayesian Optimization
 
-Each algorithm has number of hyper-parameters to be set, like in case of GBM number of trees or learning rate etc.
-Always the question is which values to choose for the parameters. There are different ways to find the optimal values for the parameters, like grid search, random search or other general optimization algorithm.
+Each algorithm has number of hyper-parameters to be set, like in case of GBM number of trees or learning rate, etc.
+As always one of the important question is which values to choose for the hyper-parameters. 
+There are different ways to find the optimal values for hyper-parameters, like grid search, random search or other general optimization algorithm.
 
 H2O supports grid search and random search. Grid search is kind of brute force and random search is too crude.
 I wished H2O guys implemented Bayesian optimization.
-But no worries. There are bunch of Bayesian optimization algorithm in `R`.
+But no worries. There are bunch of Bayesian optimization algorithms in `R`.
 On the other hand the heavy lifting part, which is function evaluation (i.e. building the models), will be carried out by H2O.
-In the following it shown how we can use `rBaysianOptimisation` package for finding the optimal hyper-parameters.
+In the following it shall be shown how we can use `rBaysianOptimisation` package for finding the optimal hyper-parameters.
 
 The function `h2o_bayes` is defined as a wrapper for `h2o.gbm` function, which builds and evaluates a GBM model.
 All the parameters that needs to be optimized are defined as an argument.
@@ -216,7 +219,7 @@ OPT_Res <- BayesianOptimization(
 
 ## Building the model using optimal parameters
 
-After searching for the best parameters using Bayesian optimization algorithm, we use the values found above to train a GBM model.
+After searching for the best hyper-parameters using Bayesian optimization algorithm, we use the values found above to train a GBM model.
 ```{r, message=FALSE, warning=FALSE, results='hide'}
 gbm <- h2o.gbm(
   x                   = x,
@@ -239,7 +242,7 @@ gbm <- h2o.gbm(
 
 ## Train a model using only important co-variables
 
-In the previous try to train a GBM model I have used all the columns in the data.
+In the previous try to train a GBM model all the columns in the data have been used.
 Many times removing irrelevant data from the training data will improves the results for various reason.
 Even if it doesn't improve the result, it will reduce the amount of resources needed for calculation, e.g. CPU time and memory.
 
@@ -249,6 +252,8 @@ Hence, a model is trained with only important variables that can be obtained fro
 
 var.imp <- h2o.varimp(gbm)[h2o.varimp(gbm)$scaled_importance > 0.01, "variable"]
 # The value of 0.01 is arbitrary, you might want to use other values.
+
+setdiff(x, var.imp)
 
 gbm_varImp <- h2o.gbm(
   x                   = var.imp,
@@ -271,7 +276,7 @@ gbm_varImp <- h2o.gbm(
 
 ## Compare the two model
 
-The plots below the tow models are compared.
+The two models are compared in the plots below, in terms of rmse and auc.
 It is clearly visible that if we use all the co-variables no significant improvement is achieved.
 
 ```{r, message=FALSE, warning=FALSE}
@@ -337,7 +342,7 @@ kable(
 
 As you know the prediction of the model is a probability of a customer is going to leave or not.
 
-Lets have a look at the prediction distribution:
+Lets have a look at the prediction distribution, for each class:
 ```{r, message=FALSE, warning=FALSE, echo=FALSE, results='hide'}
 pred <- h2o.predict(bestModel, test_frame)
 pred.df <- as.data.frame(h2o.cbind(test_frame[, y], pred))
@@ -391,12 +396,13 @@ If we know the actual costs (in the business) of false positives and false negat
 Up to now we built the model and evaluated. 
 The algorithm that we used above was GBM, which is a black box model.
 That means it only gives us prediction on which customers are going to leave, i.e. the probabilities.
+The interpretation of the model, like *why*s, is not that straight. 
 
-But we would like to have some more insights and be able to answer questions like why a customer wants to leave.
+However, we would like to have some more insights and be able to answer questions like what are the reason that customers are leaving or a customer might to leave.
 
 ## Variable Importance
 
-In many situations not all the co-variables are equally important. Some variable are more important that the others. Using variable importance we can focus more on them. 
+In many situations not all the co-variables are not equally important. Some variable are more important that the others. Using variable importance we can focus more on important variables. 
 ```{r}
 
 h2o.varimp_plot(bestModel)
@@ -405,15 +411,16 @@ h2o.varimp_plot(bestModel)
 
 ## Variable Importance per Customer
 
-The above mentioned variable importance were measured based on the whole training data set and is only valid on average, not each individual customer.
+The above mentioned variables were measured based on the whole training data set and is only valid on average. However the importance of each variable might be different for each individual customer.
 
 We can use the trained model to approximate the variable importance based on each individual customer.
+
 In this approach a prediction is done on the data set. 
 And then we leave a column out and will do the prediction again and measure the difference in probabilities.
-The difference in probabilities in original predictions compared the one the a variable is removed can indicate the importance of that variable for each customer.
+The difference in probabilities can indicate the importance of that variable for each customer.
 
 This have a little bit of calculation in `R` side, like calculating differences and ranking each row based on these differences.
-Hence, in order to speed up thing I have implemented a C++ code which also needed to be *sourced*.
+Hence, in order to speed up thing I have implemented a C++ code (`get_high_rank_values.cpp`) which also needed to be *sourced*.
 Using `Rcpp` package one can simply use C++ code in `R` script. 
 
 ```{r message=FALSE, warning=FALSE, results='hide'}
@@ -425,9 +432,9 @@ df <- rowVarImp.h2o(model=bestModel, cols=var.imp, data_frame=test_frame, n=3)
 
 ```
 
-In here only first 3 importance variable for each customer are calculated.
-The first 3 columns shows the differences by not including the variable.
-The next 3 columns shows their values and the last 3 columns shows the variables names.
+Here only first 3 importance variable for each customer are calculated.
+The first 3 columns show the differences by not including the variable.
+The next 3 columns show their values and the last 3 columns the variables names.
 
 Knowing these information the business unit can take measures based on each individual customer.
 
@@ -440,6 +447,14 @@ kable(
 ```
 
 ## Partial Dependence Plots 
+
+In previous section we talked about importance of each variable, but we didn't answer the question what to do.  
+However, it is very important to know if we change value of variable what will be the impact on the outcome.
+
+For each value for can answer that by the so called partial dependence plots.
+In the following the partial dependence plots are shown for the 5 top important variables (using `partialDependencePlot.R`).
+
+
 ```{r message=FALSE, warning=FALSE, results='hide'}
 source("https://raw.githubusercontent.com/a-ghorbani/notebooks/master/H2O/examples/churn/partialDependencePlot.R")
 
@@ -462,6 +477,11 @@ lapply(1:length(cols), function(x){
 })
 
 ```
+
+The above plots show only impact of single variable if other are kept constant.
+But in many cases, specially if there is interaction between variables, we are interested to know the impact on changing two or more variables. For this also we can use `partialDependencePlot.R`.
+As an example in the following we can see the impact of "Day Charge" for each state, and also on average.
+It can be seen that there are quite variances among different states.
 
 ```{r message=FALSE, warning=FALSE, results='hide'}
 cols <- c("State", "Day Charge")
@@ -489,6 +509,18 @@ ggplot(data = pdp1,
 ```
 
 ## A Simplified Single Decision Tree
+
+Alright, so far we did quite a lot.
+We found important variables, impact of changing each variables on the outcome.
+However, we would like to have the big picture.
+A high level insight about the model.
+
+For that, we can build a single decision tree.
+But we already know that if we use single decision tree to build the model it can't accurate.
+
+In order to improve the accuracy we use a single decision tree to approximate the GBM model.
+So we train a decision tree with that data but the target variable is replaced by the prediction of GBM.
+And we use only rows that are predicted with high confidence, i.e. probabilities close to 0 and 1.
 
 ```{r message=FALSE, warning=FALSE, results='hide'}
 denoise.h2o.df <- function(model, data_frame, destination_frame, lower.q=0.2, higher.q=0.8){
