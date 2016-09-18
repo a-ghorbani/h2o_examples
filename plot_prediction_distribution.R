@@ -1,7 +1,7 @@
 
-# This file is taken from:
+# This code is taken from:
 # https://github.com/joyofdata/joyofdata-articles
-# and I have done some minor changes.
+# and I have contributed some minor changes.
 #
 # The author (Raffael Vogler) has not mentioned under which license it's published.
 #
