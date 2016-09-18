@@ -212,7 +212,7 @@ OPT_Res <- BayesianOptimization(
     sample_rate = c(0.4, 1), 
     col_sample_rate = c(0.4, 1), 
     balance_classes = c(0L, 1L)),
-  init_points = 3,  n_iter = 3,
+  init_points = 10,  n_iter = 40,
   acq = "ucb", kappa = 2.576, eps = 0.0,
   verbose = FALSE)
 ```
@@ -350,7 +350,11 @@ pred.df <- as.data.frame(h2o.cbind(test_frame[, y], pred))
 score_table <- bestPerf@metrics$max_criteria_and_metric_scores
 best_acc_thresh <- score_table[score_table$metric == "max accuracy", "threshold"]
 
-source("https://raw.githubusercontent.com/a-ghorbani/notebooks/master/H2O/examples/plot_prediction_distribution.R")
+# The code is inspired from: 
+# http://www.joyofdata.de/blog/illustrated-guide-to-roc-and-auc/#more-3597
+# Section Distribution of the Predictions
+
+source("plot_prediction_distribution.R")
 
 p <- plot_prediction_distribution( 
   probs = pred.df$True.,
@@ -426,7 +430,7 @@ Using `Rcpp` package one can simply use C++ code in `R` script.
 ```{r message=FALSE, warning=FALSE, results='hide'}
 require(Rcpp)
 Rcpp::sourceCpp("get_high_rank_values.cpp")
-source("https://raw.githubusercontent.com/a-ghorbani/notebooks/master/H2O/examples/churn/rowVarImp.R")
+source("rowVarImp.R")
 
 df <- rowVarImp.h2o(model=bestModel, cols=var.imp, data_frame=test_frame, n=3)
 
@@ -478,7 +482,7 @@ lapply(1:length(cols), function(x){
 
 ```
 
-The above plots show only impact of single variable if other are kept constant.
+The above plots show only impact of single variable if others are kept constant.
 But in many cases, specially if there is interaction between variables, we are interested to know the impact on changing two or more variables. For this also we can use `partialDependencePlot.R`.
 As an example in the following we can see the impact of "Day Charge" for each state, and also on average.
 It can be seen that there are quite variances among different states.
@@ -520,7 +524,10 @@ But we already know that if we use single decision tree to build the model it ca
 
 In order to improve the accuracy we use a single decision tree to approximate the GBM model.
 So we train a decision tree with that data but the target variable is replaced by the prediction of GBM.
-And we use only rows that are predicted with high confidence, i.e. probabilities close to 0 and 1.
+The premise behind this, according to what a friend of me Armin told once, is that using predictions of 
+GBM (or other complex models) kind of removes the noise from the data, and makes it easier for less complex model (like single decision trees) to train.
+
+Additionally, here, we use only rows that are predicted with high confidence, i.e. probabilities close to 0 and 1.
 
 ```{r message=FALSE, warning=FALSE, results='hide'}
 denoise.h2o.df <- function(model, data_frame, destination_frame, lower.q=0.2, higher.q=0.8){
@@ -601,3 +608,19 @@ test_df$Prediction1 <- Pred1[,"True."]
 ROC1 <- roc(test_df$Churn., test_df$Prediction1)
 ROC1$auc
 ```
+
+# Conclusion
+
+The purpose of this article was to show how we can go through a data science task of a classification problem using H2O, one of the most powerful open source library for big data.
+It's speed and performance allows to accomplish analytics tasks for huge amount of data that is not so easy otherwise, like:
+
+* building **many** models,
+* parameter tuning,
+* variable importance at customer level,
+* (low dimensional) partial dependence analysis.
+
+For example note that for a two dimensional partial dependence analysis with only 20 points for each dimension we need to perform prediction over all data set 400 times (i.e. 20*20).
+
+# Disclaimer
+I am not affiliated, associated, authorized, endorsed by, or in any way officially connected with h2o.ai. I just enjoy using this product.
+
