@@ -7,7 +7,7 @@
 #include <vector>
 
 // From https://github.com/tjhladish/AbcSmc/blob/master/ranker.h
-#include "ranker.h"
+#include "include/ranker.h"
 
 using namespace Rcpp;
 
