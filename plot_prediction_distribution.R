@@ -1,4 +1,11 @@
 
+# This file is taken from:
+# https://github.com/joyofdata/joyofdata-articles
+# and I have done some minor changes.
+#
+# The author (Raffael Vogler) has not mentioned under which license it's published.
+#
+
 plot_prediction_distribution <- function(probs, truth, threshold) {
   # Plots the prediction distribution.
   #
