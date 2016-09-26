@@ -1,7 +1,6 @@
 #=============================================================
 # Load required packages
 #=============================================================
-require(readr)
 require(ggplot2)
 require(h2o)
 source("plot_h2o_grid.R")
@@ -9,30 +8,22 @@ source("plot_h2o_grid.R")
 #=============================================================
 # Init H2O (connect to a running H2O cluster)
 #=============================================================
-h2o.init(port = 54324,
-         username = "aghorbani", 
-         password = Sys.getenv("h2oPass"),  
-         startH2O = FALSE)
+h2o.init(port = 54321, startH2O = FALSE)
 
 #=============================================================
 # Load data
 #=============================================================
-# setwd("E:/Users/aghorbani/Documents/presentation/h2o")
-setwd("~/github/notebooks/H2O/examples/")
-data  <- read_csv("data/attrition.csv")
+data_frame <- 
+  h2o.importFile(
+    path              = "http://www.dataminingconsultant.com/data/churn.txt",
+    sep               = ",", 
+    destination_frame = "data_frame")
 
+colnames(data_frame) <- gsub(" ", "_", trimws(gsub("[[:punct:]]", " ", names(data_frame))))
 #=============================================================
 # Force classification
 #=============================================================
-data$Churn  <- as.factor(data$Churn)
-
-#=============================================================
-# Upload the data into H2O
-#
-# one can also use :
-#    data_frame <- h2o.uploadFile("data/attrition.csv",destination_frame = "data_frame")  
-#=============================================================
-data_frame <- as.h2o(data, destination_frame = "data_frame")
+data_frame$Churn  <- as.factor(data_frame$Churn)
 
 #=============================================================
 # Split data into training and validation
@@ -49,8 +40,7 @@ valid_frame <- split_df[[2]]
 #=============================================================
 
 y <- "Churn"
-x <- setdiff(names(data_frame), 
-             c(y,"CustID"))
+x <- setdiff(names(data_frame),  y)
 
 dl.grid <- h2o.grid(
   algorithm             = "deeplearning",

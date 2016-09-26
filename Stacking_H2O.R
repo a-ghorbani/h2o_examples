@@ -2,39 +2,31 @@
 # Load required packages
 #=============================================================
 require(h2oEnsemble)
-require(readr)
 require(ggplot2)
 require(h2o)
 
 #=============================================================
 # Init H2O (connect to a running H2O cluster)
 #=============================================================
-h2o.init(port = 54324,
-         username = "aghorbani", 
-         password = Sys.getenv("h2oPass"),  
-         startH2O = FALSE)
-
+h2o.init(port = 54321, startH2O = FALSE)
 #h2o.removeAll()
 
 #=============================================================
 # Load data
 #=============================================================
-# setwd("E:/Users/aghorbani/Documents/presentation/h2o")
-setwd("~/github/notebooks/H2O/examples/")
-data  <- read_csv("data/attrition.csv")
+data_frame <- 
+  h2o.importFile(
+    path              = "http://www.dataminingconsultant.com/data/churn.txt",
+    sep               = ",", 
+    destination_frame = "data_frame")
+
+# remove special characters from column names
+colnames(data_frame) <- gsub(" ", "_", trimws(gsub("[[:punct:]]", " ", names(data_frame))))
 
 #=============================================================
 # Force classification
 #=============================================================
-data$Churn  <- as.factor(data$Churn)
-
-#=============================================================
-# Upload the data into H2O
-#
-# one can also use :
-#    data_frame <- h2o.uploadFile("data/attrition.csv",destination_frame = "data_frame")  
-#=============================================================
-data_frame <- as.h2o(data, destination_frame = "data_frame")
+data_frame$Churn  <- as.factor(data_frame$Churn)
 
 #=============================================================
 # Split data into training and validation
@@ -46,7 +38,11 @@ split_df  <- h2o.splitFrame(data_frame, 0.7,
 train_frame <- split_df[[1]]
 valid_frame <- split_df[[2]]
 
-
+#=============================================================
+# Target and predictors
+#=============================================================
+y <- "Churn"
+x <- setdiff(names(data_frame),  y)
 #=============================================================
 # Specify base learners
 #=============================================================
@@ -126,8 +122,8 @@ h2o.dl.2 <-
 # Create base learner vector 
 #=============================================================
 learner <- c("h2o.gbm.1", "h2o.gbm.2",
-             "h2o.drf.1", "h2o.drf.2")
-            # "h2o.dl.1",  "h2o.dl.2")
+             "h2o.drf.1", "h2o.drf.2",
+             "h2o.dl.1",  "h2o.dl.2")
 
 #=============================================================
 # Specify meta-learner 
