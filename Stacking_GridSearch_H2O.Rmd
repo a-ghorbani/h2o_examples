@@ -1,19 +1,27 @@
-#=============================================================
+---
+title: "Grid search and stacking with H2O"
+author: "A. Ghorbani"
+date: "August 27, 2016"
+output: html_document
+---
+
 # Load required packages
-#=============================================================
+```{r, message=FALSE, warning=FALSE, results='hide'}
 require(h2oEnsemble)
 require(ggplot2)
 require(h2o)
+require(SuperLearner)
+require(scales)
+```
 
-#=============================================================
 # Init H2O (connect to a running H2O cluster)
-#=============================================================
+```{r, message=FALSE, warning=FALSE}
 h2o.init(port = 54321, startH2O = FALSE)
 h2o.removeAll()
+```
 
-#=============================================================
 # Load data
-#=============================================================
+```{r, message=FALSE, warning=FALSE, results='hide'}
 data_frame <- 
   h2o.importFile(
     path              = "http://www.dataminingconsultant.com/data/churn.txt",
@@ -22,31 +30,31 @@ data_frame <-
 
 # remove special characters from column names
 colnames(data_frame) <- gsub(" ", "_", trimws(gsub("[[:punct:]]", " ", names(data_frame))))
+```
 
-#=============================================================
 # Force classification
-#=============================================================
+```{r, message=FALSE, warning=FALSE}
 data_frame$Churn  <- as.factor(data_frame$Churn)
+```
 
-#=============================================================
 # Split data into training and validation
-#=============================================================
+```{r, message=FALSE, warning=FALSE}
 split_df  <- h2o.splitFrame(data_frame, 0.7, 
                             destination_frames = c("train_frame","valid_frame"), 
                             seed=2016)
 
 train_frame <- split_df[[1]]
 valid_frame <- split_df[[2]]
+```
 
-#=============================================================
 # Target and predictors
-#=============================================================
+```{r, message=FALSE, warning=FALSE}
 y <- "Churn"
 x <- setdiff(names(data_frame),  y)
+```
 
-#=============================================================
-# DL Grid search
-#=============================================================
+# Deeplearnig Grid search
+```{r, message=FALSE, warning=FALSE, results='hide'}
 dl.grid <- h2o.grid(
   algorithm             = "deeplearning",
   grid_id               = "dl.grid.search",
@@ -58,18 +66,20 @@ dl.grid <- h2o.grid(
   classification_stop   = -1,
   stopping_rounds       = 0,
   hyper_params          = list(
-    activation            = c("RectifierWithDropout", "TanhWithDropout"),
-    epochs                = c(500),
+    activation            = c("RectifierWithDropout"), #c("RectifierWithDropout", "TanhWithDropout"),
+    epochs                = c(400),
     rho                   = c(0.999,0.99),
     epsilon               = c(1e-11,1e-7),
-    balance_classes       = c(FALSE, TRUE),
-    hidden                = list(c(100,100), c(50,50), c(50)),
-    hidden_dropout_ratios = list(c(0.2,0.2), c(0.5,0.5), c(0.2), c(0.5)),
+    balance_classes       = c(FALSE), # c(FALSE, TRUE),
+    hidden                = list(c(100,100), c(50,50)),
+    hidden_dropout_ratios = list(c(0.2,0.2), c(0.5,0.5)),
     input_dropout_ratio   = c(0.2, 0.5)
   ))
-#=============================================================
+```
+
 # GBM Grid search
-#=============================================================
+
+```{r, message=FALSE, warning=FALSE, results='hide'}
 gbm.grid <- h2o.grid(
   algorithm             = "gbm",
   grid_id               = "gbm.grid.search",
@@ -88,9 +98,11 @@ gbm.grid <- h2o.grid(
     col_sample_rate  = c(0.6, 0.8), 
     sample_rate      = c(0.6, 0.8)
   ))
-#=============================================================
-# RF Grid search
-#=============================================================
+```
+
+# RandomForest Grid search
+
+```{r, message=FALSE, warning=FALSE, results='hide'}
 sqrtp <- ceiling(sqrt(length(x)))
 rf.grid <- h2o.grid(
   algorithm             = "randomForest",
@@ -111,10 +123,11 @@ rf.grid <- h2o.grid(
     col_sample_rate_per_tree   = c(0.8, 1)
   ))
 
-#=============================================================
-# Specify base learners
-#=============================================================
+```
 
+# Specify base learners
+
+```{r, message=FALSE, warning=FALSE, results='hide'}
 funcNames <-  NULL
 
 #========================
@@ -130,11 +143,11 @@ for(i in 1:3){
            stopping_metric    = "AUC",               score_tree_interval = 5,
            stopping_tolerance = 0.0001) 
     h2o.gbm.wrapper(..., 
-                    ntrees	            = ntrees,               learn_rate         = learn_rate, 
-                    max_depth           = max_depth,            col_sample_rate    = col_sample_rate, 
-                    sample_rate         = sample_rate,          seed               = seed,
-                    stopping_rounds     = stopping_rounds,      stopping_metric    = stopping_metric,
-                    score_tree_interval = score_tree_interval,  stopping_tolerance = stopping_tolerance)
+                    ntrees	           = ntrees,            learn_rate          = learn_rate, 
+                    max_depth          = max_depth,         col_sample_rate     = col_sample_rate, 
+                    sample_rate        = sample_rate,       stopping_rounds     = stopping_rounds,
+                    stopping_metric    = stopping_metric,   score_tree_interval = score_tree_interval,
+                    stopping_tolerance = stopping_tolerance)
   ')
   
   funcNames <- c(funcNames, funcName)
@@ -170,13 +183,18 @@ for(i in 1:3){
 #========================
 for(i in 1:3){
   x_ <- dl.grid@summary_table[i,]
-  funcName <- paste0("h2o.rf.", i)
+  funcName <- paste0("h2o.dl.", i)
+  m  <- h2o.getModel(dl.grid@model_ids[[i]])
+  a  <- deparse(m@allparameters$activation)
+  hl <- deparse(m@allparameters$hidden)
+  hd <- deparse(m@allparameters$hidden_dropout_ratios)
+  bc <- deparse(m@allparameters$balance_classes)
   func <- paste('function(...,
-           activation         =', x_$activation,',     epochs                =', x_$epochs,',
-           hidden             =', x_$hidden,',         hidden_dropout_ratios =', x_$hidden_dropout_ratios,',
-           rho                =', x_$rho,',            epsilon               =', x_$epsilon,',
-           balance_classes    =', x_$balance_classes,' input_dropout_ratio   =', x_$input_dropout_ratio,',
-           classification_stop  = -1,                  stopping_rounds        = 0)
+           activation         =', a,',                epochs                =', 500,',
+           hidden             =', hl,',               hidden_dropout_ratios =', hd,',
+           rho                =', x_$rho,',           epsilon               =', x_$epsilon,',
+           balance_classes    =', bc,',               input_dropout_ratio   =', x_$input_dropout_ratio,',
+           classification_stop  = -1,                 stopping_rounds       = 0)
     h2o.deeplearning.wrapper(...,
            activation         = activation,           epochs                = epochs,
            hidden             = hidden,               hidden_dropout_ratios = hidden_dropout_ratios,
@@ -188,7 +206,11 @@ for(i in 1:3){
   funcNames <- c(funcNames, funcName)
   assign(funcName, eval(parse(text=func)))
 }
+```
 
+# Fit stacked learners GLM
+
+```{r, message=FALSE, warning=FALSE, results='hide'}
 #=============================================================
 # Create base learner vector 
 #=============================================================
@@ -217,19 +239,116 @@ ensemble.fit <- h2o.ensemble(
 # Save the models if you want
 #=============================================================
 # h2o.save_ensemble(fit, path = "ens_models/", export_levelone = TRUE)
+```
 
-perf <- h2o.ensemble_performance(
+## Performance of the stacked model on validation set
+
+```{r, message=FALSE, warning=FALSE, results='hide'}
+perf.en.glm <- h2o.ensemble_performance(
    object            = ensemble.fit, 
    newdata           = valid_frame,
    score_base_models = TRUE)
+```
+
+```{r, message=FALSE, warning=FALSE}
 
 #=============================================================
 # Print stacked fit AUC score
 #=============================================================
-print(perf, metric = "AUC")
+print(perf.en.glm, metric = "AUC")
 
 #=============================================================
 # Print stacked fit MSE score
 #=============================================================
-print(perf, metric = "MSE")
+print(perf.en.glm, metric = "MSE")
+```
 
+# Fit stacked learners GBM
+
+```{r, message=FALSE, warning=FALSE, results='hide'}
+#=============================================================
+# Create base learner vector 
+#=============================================================
+learner <- funcNames
+
+#=============================================================
+# Specify meta-learner 
+#=============================================================
+metalearner <- "h2o.gbm.wrapper"
+
+#=============================================================
+# Fit Stacked learners
+#=============================================================
+family <- "binomial"
+ensemble.fit.gbm <- h2o.ensemble(
+  x              = x, 
+  y              = y, 
+  training_frame = train_frame, 
+  family         = family, 
+  learner        = learner, 
+  metalearner    = metalearner,
+  cvControl      = list(V = 5, shuffle = TRUE))
+```
+
+## Performance of the stacked model on validation set
+
+```{r, message=FALSE, warning=FALSE, results='hide'}
+perf.en.gbm <- h2o.ensemble_performance(
+   object            = ensemble.fit.gbm, 
+   newdata           = valid_frame,
+   score_base_models = TRUE)
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+#=============================================================
+# Print stacked fit AUC score
+#=============================================================
+print(perf.en.gbm, metric = "AUC")
+
+#=============================================================
+# Print stacked fit MSE score
+#=============================================================
+print(perf.en.gbm, metric = "MSE")
+```
+
+# Plot AUC for all the models (base models + stacked)
+
+```{r, message=FALSE, warning=FALSE}
+
+getMetrics <- function(perf, metric){
+  ensemble_metric  <- data.frame(score=perf$ensemble@metrics[[metric]], learner="ensemble")
+  base_metrics     <- as.data.frame(sapply(perf$base, function(p)(p@metrics[[metric]])))
+  base_metrics$alg <- row.names(base_metrics)
+  colnames(base_metrics) <- c("score", "learner")
+  
+  metrics <- rbind(base_metrics, ensemble_metric)
+  metrics$metalearner <- perf$ensemble@algorithm
+  return(metrics)
+}
+
+metric <- "AUC"
+scores.all <- getMetrics(perf.en.glm, metric)
+scores.all <- rbind(scores.all, getMetrics(perf.en.gbm, metric))
+
+# Sort levels based on score
+scores.all <- within(scores.all, learner <- factor(learner, levels=unique(learner[order(score)])))
+
+ggplot(data = scores.all, aes(x=learner, y = score, fill= metalearner)) + 
+  geom_bar(stat = "identity", position=position_dodge())+
+  scale_y_continuous(limits=c(0.8,1.0), oob = rescale_none)
+```
+
+# Plot MSE for all the models (base models + stacked)
+
+```{r, message=FALSE, warning=FALSE}
+metric <- "MSE"
+scores.all <- getMetrics(perf.en.glm, metric)
+scores.all <- rbind(scores.all, getMetrics(perf.en.gbm, metric))
+
+# Sort levels based on score
+scores.all <- within(scores.all, learner <- factor(learner, levels=unique(learner[order(score)])))
+
+ggplot(data = scores.all, aes(x=learner, y = score, fill= metalearner)) + 
+  geom_bar(stat = "identity", position=position_dodge())
+```
