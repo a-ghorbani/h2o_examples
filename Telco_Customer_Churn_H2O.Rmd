@@ -10,31 +10,30 @@ A data science example using H2O ([h2o.ai](http://h2o.ai)) to investigate a clas
 
 # Introduction
 
-H2O is a open-source machine learning software for big-data. 
+H2O is an open-source machine learning software for big-data. 
 It is produced in 2011 by the start-up H2O.ai. 
-The performance of H2O allows to do a lot of data science analysis possible through fit hundreds of models, fast prediction of large data and a lot other interesting thing that some of them we will be seeing in this document.
+The performance of H2O allows to perform various data science analysis possible through fitting hundreds of models, fast prediction of large amount of data and a lot other interesting thing that some of them we will be seen in this article.
 
-The problem under study is classification of a telecom company customers into whether they would stay as customer or leave the company.
-Many companies are interested to know when, why, which customer they are going to lose.
-Acquiring this information they can take action accordingly.
+The example I chose to investigate is classification of a telecom company customers into whether they would stay as customer or leave the company.
+Many companies are interested to know when, why, which customer are going to leave.
+Acquiring this information they can take appropriate actions accordingly.
 
 I chose churn analysis here just as an example, any other (binary) classification problem can be done the same as well.
-Multi-class classification requires some adjustments.
-
+A multi-class classification requires some adjustments.
 
 I am going to cover the following analysis:
 
 * prediction of customer churn probability using gradient boosting machine (GBM),
 * parameter tuning using Bayesian optimization,
 * interpretation of the model:
-    + specifying the co-variables that have importance for the analysis,
-    + specifying the most important co-variables that is responsible for churn probability of each individual customer,
+    + specifying the co-variables that have high importance for the analysis,
+    + specifying the most important co-variables that is responsible for churn probability for each individual customer,
     + constructing a single decision tree (for interpretation of the black box GBM model),
     + (partial) dependence of churn probabilities on each co-variables.
 
-The purpose of this note is to show how the above mentioned analyses can be applied using h2o.
+The purpose of this note is to show how the above mentioned analyses can be applied using H2O.
 
-# Load the required packages
+# Required packages
 
 The following packages are necessary for this analysis.
 
@@ -62,34 +61,37 @@ require(h2o)
 
 # Init H2O (connect to a running H2O cluster)
 
-We need to download h2o package, if we hadn't installed before.
+We need to download H2O package, if we hadn't installed it before.
 At the time of writing this text the latest version was 3.11.0.3596 and I downloaded from [here](http://s3.amazonaws.com/h2o-release/h2o/master/3596/index.html).
 After downloading we need to unzip it.
 
-I usually prefer to run h2o from command line.
-For more details on how to start h2o from command line see [here](http://docs.h2o.ai/h2o/latest-stable/h2o-docs/starting-h2o.html#from-the-command-line).
+There are different ways to start H2O cluster. 
+I usually prefer to start it from command line.
+For more details on how to start H2O from command line see [here](http://docs.h2o.ai/h2o/latest-stable/h2o-docs/starting-h2o.html#from-the-command-line).
 
 ```{bash eval=FALSE}
 > java -jar h2o.jar -nthreads 2 -ice_root ./tmp -port 54321 -name AwesomeCloud
 ```
 
-Additionally you need to install h2o `R` API package in `R`.
+Additionally you need to install H2O `R` API package in `R`, or if you would like to use H2O from Python you have to install Python API, or other languages you prefer to work with. H2O supports various APIs.
+Here I use `R` to connect to H2O cluster, therefore we need to install its `R` API.
 ```{r eval=FALSE}
 install.packages("path_to_h2o_dir/h2o-3.11.0.3596/R/h2o_3.11.0.3596.tar.gz", repos=NULL, type = "source")
 ```
 
-Finally use `h2o.init()` to connect the h2o cluster (in our case with only one node).
+Finally use `h2o.init()` to connect the running H2O cluster (in our case with only one node).
 
 ```{r, message=FALSE, warning=FALSE}
 # Connect to h2o cluster
 h2o.init(port = 54321, startH2O = FALSE)
 
+# Remove all objects in the h2o cluster.
 h2o.removeAll()
 ```
 
 # Load the data into h2o
 
-For this example, here, we use the data from  [http://www.dataminingconsultant.com/data/churn.txt](http://www.dataminingconsultant.com/data/churn.txt).
+In the example here, we use the data from  [http://www.dataminingconsultant.com/data/churn.txt](http://www.dataminingconsultant.com/data/churn.txt).
 The description of the columns can be found [here](http://www.sgi.com/tech/mlc/db/churn.names).
 
 ```{r, message=FALSE, warning=FALSE, results='hide'}
@@ -101,7 +103,7 @@ data_frame <-
 
 ```
 
-Let's have a look at the data:
+Let's have a look at the first few rows of the data we just loaded:
 ```{r, message=FALSE, warning=FALSE, echo=FALSE}
 library(knitr)
 
@@ -125,9 +127,9 @@ For exact meaning of other columns see [here](http://www.sgi.com/tech/mlc/db/chu
 In order to build and assess the model we are going to split the data into *training*, *validation* and *testing* data set.
 I assume that the analysis here is applied to a large data set.
 It is not true in this example, though, since we have only `r nrow(data_frame)` number of rows, which is not that big.
-In such case it is better to split the data set into only training and testing. And for model selection and hyper-parameter tuning using cross-validation. 
+In such case it is better to split the data set into only training and testing. And for model selection and hyper-parameter tuning using the cross-validation technique. 
 
-Since, I assume the example here will be used for a very large data set, otherwise why somebody wants to use H2O ;),
+As I assume the example here will be applied to a very large data set, otherwise why somebody wants to use H2O ;),
 the data set is split into training, validation and testing with ratio of %50, %25 and %25, respectively.
 
 ```{r, message=FALSE, warning=FALSE}
@@ -143,7 +145,6 @@ valid_frame <- split_df[[2]]
 test_frame  <- split_df[[3]]
 ```
 
-
 # Building model
 
 First the target variable, which is `Churn?` and the co-variables (the rest of the other variables) are defined.
@@ -152,18 +153,19 @@ y <- "Churn?"
 x <- setdiff(names(data_frame),  c(y))
 ```
 
-
 ## Bayesian Optimization
 
 Each algorithm has number of hyper-parameters to be set, like in case of GBM number of trees or learning rate, etc.
 As always one of the important question is which values to choose for the hyper-parameters. 
 There are different ways to find the optimal values for hyper-parameters, like grid search, random search or other general optimization algorithm.
 
-H2O supports grid search and random search. Grid search is kind of brute force and random search is too crude.
-I wished H2O guys implemented Bayesian optimization.
-But no worries. There are bunch of Bayesian optimization algorithms one can use.
+H2O supports grid search and random search. Grid search is kind of brute force and random search is too crude. Though for many cases these approach are sufficient, it is not known from prior whether that is sufficient.
+Bayesian optimization is used for automatic tuning of hyper-parameters. In this approach the information obtained from previous function evaluation (i.e. building and evaluating models using various hyper-parameters) is used to approximate best next hyper-parameters to be tried out.
+
+I wished H2O guys have implemented Bayesian optimization.
+But no worries. There are bunch of Bayesian optimization algorithms one can use, in `R`, Python, C++, etc.
 On the other hand the heavy lifting part, which is function evaluation (i.e. building the models), will be carried out by H2O.
-In the following it shall be shown how we can use `rBaysianOptimisation` package for finding the optimal hyper-parameters.
+In the following it shall be shown how we can use `rBaysianOptimisation` package in `R` for finding the optimal hyper-parameters.
 
 The function `h2o_bayes` is defined as a wrapper for `h2o.gbm` function, which builds and evaluates a GBM model.
 All the parameters that needs to be optimized are defined as an argument for this function.
@@ -242,16 +244,16 @@ gbm <- h2o.gbm(
 
 ## Train a model using only important co-variables
 
-In the previous try to train a GBM model all the columns in the data have been used.
-Many times removing irrelevant data from the training data will improves the results for various reason.
+In the previous section we used all the columns to train a GBM model.
+Many times removing irrelevant data from the training data will improve the results, for various reason.
 Even if it doesn't improve the result, it will reduce the amount of resources needed for calculation, e.g. CPU time and memory.
 
-Hence, a model is trained with only important variables that can be obtained from previous calculation.
+Now we remove the variables that are not important. However, note that the variable importance is obtained from previous calculation.
 
 ```{r, message=FALSE, warning=FALSE}
 
-var.imp <- h2o.varimp(gbm)[h2o.varimp(gbm)$scaled_importance > 0.01, "variable"]
-# The value of 0.01 is arbitrary, you might want to use other values.
+var.imp <- h2o.varimp(gbm)[h2o.varimp(gbm)$scaled_importance > 0.05, "variable"]
+# The value of 0.05 is arbitrary, you might want to use other values.
 
 setdiff(x, var.imp)
 ```
@@ -279,7 +281,7 @@ gbm_varImp <- h2o.gbm(
 ## Compare the two model
 
 The two models are compared in the plots below, in terms of rmse and auc.
-It is clearly visible that if we use only the important variables the performance of the model is not reduced significantly.
+It is can be seen that if we use only the important variables the performance of the model is not reduced significantly, if any.
 
 ```{r, message=FALSE, warning=FALSE}
 shist <- gbm@model$scoring_history[, c("duration", "validation_rmse", "validation_auc")]
@@ -306,7 +308,7 @@ ggplot(data = scoring_history,
 ```
 
 
-Choose the best model based on `AUC` measure (you could choose `mse`, `logloss` or other measures).
+Choose the best model based on `AUC` measure (you could choose `mse`, `logloss` or other measures which you might find more appropriate in your case).
 ```{r, message=FALSE, warning=FALSE}
 
 AUC_gbm        <- h2o.performance(gbm, valid = T)@metrics$AUC
@@ -324,7 +326,7 @@ cat("The best model is '", bestModel@model_id,
 
 # Model Assessment
 
-Now we use the test data to measure the performance of the model:
+Now we use the test data to measure the performance of the trained model:
 ```{r, message=FALSE, warning=FALSE}
 bestPerf <- h2o.performance(bestModel, test_frame)
 
@@ -351,7 +353,7 @@ kable(
 ```
 
 As you know the prediction of the model is a probability of a customer churn.
-In order to have a visual feeling about performance of the model, distribution of the prediction is plotted against true outcome.
+In order to have a visual feeling about performance of the model, distribution of the prediction is plotted against the true outcome.
 
 Lets have a look at the prediction distribution, for each class:
 ```{r, message=FALSE, warning=FALSE, echo=FALSE, results='hide'}
@@ -375,21 +377,25 @@ p <- plot_prediction_distribution(
 p
 ```
 
-We would like to have all data points be either in top right (True Positive (TP)) or bottom left (True Negative (TN)).
+The horizontal axis show the true values, i.e. the values of `Churn?` column.
+The vertical axis show the model prediction probability for churn.
+In principle we can define a criteria for probability for which a customer with a higher value can be identified as churned customer and with lower value as loyal customer. 
+This criteria could be a value like `0.5`, or a value that has best accuracy which is `r best_acc_thresh` in this case.
+We would like to have all the data points be either in the top right (True Positive (TP)) or bottom left (True Negative (TN)). The data points in top left and bottom right are misclassified.
 
-I have seen this plot for the first time [here](http://www.joyofdata.de/blog/illustrated-guide-to-roc-and-auc/#more-3597).
+I have seen this kind of plot for the first time [here](http://www.joyofdata.de/blog/illustrated-guide-to-roc-and-auc/#more-3597).
 
 So, which customer is going to leave?
-If the prediction value is more than 0.5? well it depends on our criteria.
+As mentioned above if the prediction value is more than 0.5 or based on other criteria.
 Here are some of the criteria and the maximum value we can get depending on which criteria we choose: 
-```{r, message=FALSE, warning=FALSE, kable3}
+```{r, message=FALSE, warning=FALSE}
 
 kable(bestPerf@metrics$max_criteria_and_metric_scores, digits = 3)
 
 ```
 
 and here are the plots of few of them.
-```{r, message=FALSE, warning=FALSE, kable4}
+```{r, message=FALSE, warning=FALSE}
 scores_to_plot <- c("accuracy", "precision", "recall", "min_per_class_accuracy")
 
 ggplot(data = perfDF[perfDF$variable %in% scores_to_plot, ],  
@@ -407,16 +413,16 @@ If we know the actual costs (in the business) of false positives and false negat
 
 # Interpretation of the Model
 
-Up to now we built the model and evaluated. 
+So far so good, we built the model and have evaluated it. 
 The algorithm that we used above was GBM, which is a black box model.
 That means it only gives us prediction on which customers are going to leave, i.e. the probabilities.
-The interpretation of the model, like *why*s, is not that straight. 
+The interpretation of the model, like *why*s, is not that straightforward. 
 
 However, we would like to have some more insights and be able to answer questions like what are the reason that customers are leaving or a customer might to leave.
 
 ## Variable Importance
 
-In many situations not all the co-variables are equally important. Some variable are more important that the others. Using variable importance we can focus more on important variables. 
+In many situations not all the co-variables are equally important. Some variable are more important than the others. Using variable importance we can focus more on important variables. 
 ```{r}
 
 h2o.varimp_plot(bestModel)
@@ -434,7 +440,7 @@ And then we leave a column out and will do the prediction again and measure the 
 The difference in probabilities can indicate the importance of that variable for each customer.
 
 This have a little bit of calculation in `R` side, like calculating differences and ranking each row based on these differences.
-Hence, in order to speed up thing I have implemented a C++ code (`get_high_rank_values.cpp`) which also needed to be *sourced*.
+Hence, in order to speed up things I have implemented a C++ code (`get_high_rank_values.cpp`) which also needed to be *sourced*.
 Using `Rcpp` package one can simply use C++ code in `R` script. 
 
 ```{r message=FALSE, warning=FALSE, results='hide'}
@@ -448,9 +454,9 @@ df <- rowVarImp.h2o(model=bestModel, cols=var.imp, data_frame=test_frame, n=3)
 
 Here only first 3 important variables for each customer are calculated.
 The first 3 columns show the differences in the probabilities by not including the variable.
-The next 3 columns show their values and the last 3 columns the variables names.
+The next 3 columns show their values and the last 3 columns the variables name.
 
-Knowing these information the business unit can take measures based on each individual customer.
+Knowing these information the business unit can take measures based on each individual customer (not averaged on all customer like the general variable importance).
 
 ```{r message=FALSE, warning=FALSE, eval=FALSE}
 head(df)
@@ -465,7 +471,7 @@ kable(
 
 ## Partial Dependence Plots 
 
-In previous section we talked about importance of each variable, but we didn't answer the question of how changing variables would change the outcome.  
+In the previous section we talked about importance of each variable, but we didn't answer the question of how changing variables would change the outcome.  
 However, it is very important to know if we change value of a variable what will be the impact on the outcome.
 
 This kind of question can be answered by the so called partial dependence plots.
@@ -536,10 +542,12 @@ But we already know that if we use single decision tree to build a model it woul
 
 In order to improve the accuracy we use a single decision tree to approximate the GBM model.
 We train a decision tree with that data but the target variable is replaced by the predictions of GBM.
-The premise behind this, according to what a friend of me Armin told once, is that using predictions of 
+The premise behind this, according to what a friend of me Armin Monecke told once, is that using predictions of 
 GBM (or other complex models) kind of removes the noise from the data, and makes it easier for less complex model (like single decision trees) to train.
 
-Additionally, here, we use only rows that are predicted with high confidence, i.e. probabilities close to 0 and 1.
+Additionally, here, we use only rows that are predicted with high confidence, i.e. probabilities close to 0 and 1. 
+
+Note: since we sample the data points, we need to take care of prior distribution (e.g. sampling with the same distribution of target column or specifying it for example using `prior` parameter in the algorithm).
 
 ```{r message=FALSE, warning=FALSE, results='hide'}
 denoise.h2o.df <- function(model, data_frame, destination_frame, lower.q=0.2, higher.q=0.8){
@@ -624,7 +632,7 @@ ROC1$auc
 # Conclusion
 
 The purpose of this article was to show how we can go through a data science task of a classification problem using H2O, one of the most powerful open source library for big data.
-Its speed and performance allows to accomplish analytics tasks for huge amount of data that, like:
+Its speed and performance allows to accomplish analytics tasks for huge amount of data, like:
 
 * building **many** models,
 * parameter tuning,
