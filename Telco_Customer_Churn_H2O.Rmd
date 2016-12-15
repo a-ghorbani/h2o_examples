@@ -3,16 +3,39 @@ title: "Data science with H2O"
 subtitle: "A classification problem: Telco Customer Churn"
 author: "A. Ghorbani"
 date: "August 27, 2016"
-output: html_document
+output: 
+  html_document:
+    toc: yes
+    toc_depth: 2
 ---
 
-A data science example using H2O ([h2o.ai](http://h2o.ai)) to investigate a classification problem, namely customer churn.
+
+<div style="background-color:#EBEDEF;padding:5px;">
+
+**A note on reproduction of the contenct of this article**
+  
+The r-markdown file of this article (and some other useful examples) can be found here:  [https://github.com/a-ghorbani/h2o_examples](https://github.com/a-ghorbani/h2o_examples)
+
+You may also find a docker file in this repository, [Dockerfile](https://github.com/a-ghorbani/h2o_examples/blob/master/Dockerfile), which contains all the instructions that are necessary to run this example, like installing h2o, r-studio and all the r packages.
+
+You can pull the docker image from [here](), with running the following command: 
+
+```{bash eval=FALSE}
+> docker run -p 8787:8787 -p 54321:54321 -p 8080:8080 a-ghorbani/rstudio-h2o:7317
+```
+
+Then you should be able to browse to http://localhost:8787, where you can get a web based r-studio.
+After login in using user `guest` and password `guest`, there should be a folder named `h2o_examples-master`.
+In this folder you can open `Telco_Customer_Churn_H2O.Rmd`, and ... yoohoo run it.
+</div>
 
 # Introduction
 
+This is a data science example using H2O ([h2o.ai](http://h2o.ai)) to investigate a classification problem, namely customer churn.
+
 H2O is an open-source machine learning software for big-data. 
 It is produced in 2011 by the start-up H2O.ai. 
-The performance of H2O allows to perform various data science analysis possible through fitting hundreds of models, fast prediction of large amount of data and a lot other interesting thing that some of them we will be seen in this article.
+The performance of H2O allows to perform various data science analyses possible through fitting hundreds of models, fast prediction of large amount of data and a lot other interesting thing that some of them we will be seen in this article.
 
 The example I chose to investigate is classification of a telecom company customers into whether they would stay as customer or leave the company.
 Many companies are interested to know when, why, which customer are going to leave.
@@ -21,7 +44,7 @@ Acquiring this information they can take appropriate actions accordingly.
 I chose churn analysis here just as an example, any other (binary) classification problem can be done the same as well.
 A multi-class classification requires some adjustments.
 
-I am going to cover the following analysis:
+I am going to cover the following analyses:
 
 * prediction of customer churn probability using gradient boosting machine (GBM),
 * parameter tuning using Bayesian optimization,
@@ -62,7 +85,7 @@ require(h2o)
 # Init H2O (connect to a running H2O cluster)
 
 We need to download H2O package, if we hadn't installed it before.
-At the time of writing this text the latest version was 3.11.0.3596 and I downloaded from [here](http://s3.amazonaws.com/h2o-release/h2o/master/3596/index.html).
+At the time of writing this text the latest version was 3.11.0.3717 and I downloaded from [here](http://s3.amazonaws.com/h2o-release/h2o/master/3717/index.html).
 After downloading we need to unzip it.
 
 There are different ways to start H2O cluster. 
@@ -73,17 +96,17 @@ For more details on how to start H2O from command line see [here](http://docs.h2
 > java -jar h2o.jar -nthreads 2 -ice_root ./tmp -port 54321 -name AwesomeCloud
 ```
 
-Additionally you need to install H2O `R` API package in `R`, or if you would like to use H2O from Python you have to install Python API, or other languages you prefer to work with. H2O supports various APIs.
-Here I use `R` to connect to H2O cluster, therefore we need to install its `R` API.
+Additionally you need to install H2O R API package in R, or if you would like to use H2O from Python you have to install Python API, or other languages you prefer to work with. H2O supports various APIs.
+Here I use R to connect to H2O cluster, therefore we need to install its R API.
 ```{r eval=FALSE}
-install.packages("path_to_h2o_dir/h2o-3.11.0.3596/R/h2o_3.11.0.3596.tar.gz", repos=NULL, type = "source")
+install.packages("path_to_h2o_dir/h2o-3.11.0.3717/R/h2o_3.11.0.3717.tar.gz", repos=NULL, type = "source")
 ```
 
 Finally use `h2o.init()` to connect the running H2O cluster (in our case with only one node).
 
 ```{r, message=FALSE, warning=FALSE}
 # Connect to h2o cluster
-h2o.init(port = 54321, startH2O = FALSE)
+h2o.init(port = 54321)
 
 # Remove all objects in the h2o cluster.
 h2o.removeAll()
@@ -127,7 +150,7 @@ For exact meaning of other columns see [here](http://www.sgi.com/tech/mlc/db/chu
 In order to build and assess the model we are going to split the data into *training*, *validation* and *testing* data set.
 I assume that the analysis here is applied to a large data set.
 It is not true in this example, though, since we have only `r nrow(data_frame)` number of rows, which is not that big.
-In such case it is better to split the data set into only training and testing. And for model selection and hyper-parameter tuning using the cross-validation technique. 
+In such a case it is better to split the data set into only training and testing. And for model selection and hyper-parameter tuning using the cross-validation technique. 
 
 As I assume the example here will be applied to a very large data set, otherwise why somebody wants to use H2O ;),
 the data set is split into training, validation and testing with ratio of %50, %25 and %25, respectively.
@@ -153,19 +176,48 @@ y <- "Churn?"
 x <- setdiff(names(data_frame),  c(y))
 ```
 
-## Bayesian Optimization
+## Building model using GBM
+
+Let's first just build a model using the gradient boosting machine (GBM) with arbitrarily chosen hyper-parameter.
+GBM is a machine learning algorithm for regression and classification problems. It builds a model in the form of an ensemble of (weak) prediction models like decision trees.
+For more details refer to [this](https://en.wikipedia.org/wiki/Gradient_boosting), [this](http://www.jstor.org/stable/2699986?seq=1#page_scan_tab_contents) and [this](http://www.chengli.io/tutorials/gradient_boosting.pdf).
+
+```{r, message=FALSE, warning=FALSE, results='hide'}
+gbm.1 <- h2o.gbm(  
+  x                   = x,
+  y                   = y,
+  training_frame      = train_frame,
+  validation_frame    = valid_frame,
+  ntrees              = 100,
+  max_depth           = 3,
+  learn_rate          = 0.2)
+```
+
+In the above example we used `train_frame` to train the model and `valid_frame` to evaluate the performance.
+We can see the performance in tho following:
+
+```{r, message=FALSE, warning=FALSE}
+ h2o.performance(gbm.1, valid = T)
+```
 
 Each algorithm has number of hyper-parameters to be set, like in case of GBM number of trees or learning rate, etc.
 As always one of the important question is which values to choose for the hyper-parameters. 
 There are different ways to find the optimal values for hyper-parameters, like grid search, random search or other general optimization algorithm.
 
-H2O supports grid search and random search. Grid search is kind of brute force and random search is too crude. Though for many cases these approach are sufficient, it is not known from prior whether that is sufficient.
-Bayesian optimization is used for automatic tuning of hyper-parameters. In this approach the information obtained from previous function evaluation (i.e. building and evaluating models using various hyper-parameters) is used to approximate best next hyper-parameters to be tried out.
+We can use Bayesian optimization to find out an approximation of the optimized hyper-parameters.
+
+## Bayesian Optimization
+
+H2O supports grid search and random search. Grid search is kind of brute force (it increases exponentially with the number of parameters) and random search is too crude. Though for many cases these approaches are sufficient, it is not known from prior whether that is sufficient.
+
+Bayesian optimization (BO) is used for automatic tuning of hyper-parameters. In this approach the information obtained from previous function evaluation (i.e. building and evaluating models using various hyper-parameters) is used to approximate best next hyper-parameters to be tried out.
+BO builds a probabilistic model for the objective function, which here is the performance of the model.
+For more information have a look [here](https://arxiv.org/pdf/1206.2944.pdf) and  [here](https://www.cs.ox.ac.uk/people/nando.defreitas/publications/BayesOptLoop.pdf).
 
 I wished H2O guys have implemented Bayesian optimization.
-But no worries. There are bunch of Bayesian optimization algorithms one can use, in `R`, Python, C++, etc.
+But no worries. There are bunch of Bayesian optimization algorithms one can use, in R, Python, C++, etc.
 On the other hand the heavy lifting part, which is function evaluation (i.e. building the models), will be carried out by H2O.
-In the following it shall be shown how we can use `rBaysianOptimisation` package in `R` for finding the optimal hyper-parameters.
+In the following it shall be shown how we can use `rBaysianOptimisation` package in R for finding the optimal hyper-parameters.
 
 The function `h2o_bayes` is defined as a wrapper for `h2o.gbm` function, which builds and evaluates a GBM model.
 All the parameters that needs to be optimized are defined as an argument for this function.
@@ -377,9 +429,9 @@ p <- plot_prediction_distribution(
 p
 ```
 
-The horizontal axis show the true values, i.e. the values of `Churn?` column.
-The vertical axis show the model prediction probability for churn.
-In principle we can define a criteria for probability for which a customer with a higher value can be identified as churned customer and with lower value as loyal customer. 
+The horizontal axis shows the true values, i.e. the values of `Churn?` column.
+The vertical axis shows the model prediction probability for churn.
+In principle we can define a criteria for probability which a customer with a higher value can be identified as churned customer and with lower value as loyal customer. 
 This criteria could be a value like `0.5`, or a value that has best accuracy which is `r best_acc_thresh` in this case.
 We would like to have all the data points be either in the top right (True Positive (TP)) or bottom left (True Negative (TN)). The data points in top left and bottom right are misclassified.
 
@@ -394,7 +446,7 @@ kable(bestPerf@metrics$max_criteria_and_metric_scores, digits = 3)
 
 ```
 
-and here are the plots of few of them.
+and here are the plots of few of them against various criteria.
 ```{r, message=FALSE, warning=FALSE}
 scores_to_plot <- c("accuracy", "precision", "recall", "min_per_class_accuracy")
 
@@ -418,7 +470,7 @@ The algorithm that we used above was GBM, which is a black box model.
 That means it only gives us prediction on which customers are going to leave, i.e. the probabilities.
 The interpretation of the model, like *why*s, is not that straightforward. 
 
-However, we would like to have some more insights and be able to answer questions like what are the reason that customers are leaving or a customer might to leave.
+However, we would like to have some more insights and be able to answer questions like what are the reasons that customers are leaving or a specific customer might to leave.
 
 ## Variable Importance
 
@@ -439,9 +491,9 @@ In this approach a prediction is done on the data set.
 And then we leave a column out and will do the prediction again and measure the difference in probabilities.
 The difference in probabilities can indicate the importance of that variable for each customer.
 
-This have a little bit of calculation in `R` side, like calculating differences and ranking each row based on these differences.
+This have a little bit of calculation in R side, like calculating differences and ranking each row based on these differences.
 Hence, in order to speed up things I have implemented a C++ code (`get_high_rank_values.cpp`) which also needed to be *sourced*.
-Using `Rcpp` package one can simply use C++ code in `R` script. 
+Using `Rcpp` package one can simply use C++ code in R script. 
 
 ```{r message=FALSE, warning=FALSE, results='hide'}
 require(Rcpp)
@@ -475,18 +527,24 @@ In the previous section we talked about importance of each variable, but we didn
 However, it is very important to know if we change value of a variable what will be the impact on the outcome.
 
 This kind of question can be answered by the so called partial dependence plots.
-In the following the partial dependence plots are shown for the 5 top important variables (using `partialDependencePlot.R`).
+Partial dependence plots depicts, indeed, the marginal effect of the variables.
+In the following the partial dependence plots are shown for the 5 top important variables.
+
+In order to calculate partial dependence we can use `partialDependencePlot.R`.
+However, since at least version 3.11.0.3717 h2o has `h2o.partialPlot` function to calculate one dimensional partial dependence.
+I like my own implementation better because of its functionality, however `h2o.partialPlot` is much faster.
 
 ```{r message=FALSE, warning=FALSE, results='hide'}
-source("partialDependencePlot.R")
 
 cols <- var.imp[1:5]
-pdps <- lapply(cols, function(x) partialDependencePlot(bestModel, x, data_frame) )
+pdps <- h2o.partialPlot(bestModel, data_frame, cols, nbins = 100, plot = F)
+mean.orig <- mean(h2o.predict(bestModel, data_frame)[,3])
 
 lapply(1:length(cols), function(x){
-  x_ <- melt(pdps[[x]])
+  x_ <- pdps[[x]] 
   colnames(x_) <- c("variable", "diff")
-  if(class(x_$variable) == 'factor'){
+  x_$diff <- x_$diff - mean.orig
+  if(class(x_$variable) == 'factor' || class(x_$variable) == 'character'){
     # order based on diff
     x_ <- within(x_, variable <- factor(variable, levels=variable[order(-diff)]))
     p <- ggplot(data = x_, aes(x = variable, y = diff)) +
@@ -502,10 +560,11 @@ lapply(1:length(cols), function(x){
 
 The above plots show only impact of single variable if others are kept constant.
 But in many cases, specially if there is interaction between variables, we are interested to know the impact on changing two or more variables. For this also we can use `partialDependencePlot.R`.
-As an example, in the following we can see the impact of "Day Charge" for each state, and also on average.
+As an example, in the following we can see the impact of "Day Charge" for each state (the colored thin lines), and also on average (the thick black line).
 It can be seen that there are quite variances among different states.
 
 ```{r message=FALSE, warning=FALSE, results='hide'}
+source("partialDependencePlot.R")
 cols <- c("State", "Day Charge")
 pdp1 <- partialDependencePlot(bestModel, cols, data_frame)
 
@@ -540,14 +599,14 @@ A high level insight about the model.
 For that, we can build a single decision tree.
 But we already know that if we use single decision tree to build a model it wouldn't be that accurate.
 
-In order to improve the accuracy we use a single decision tree to approximate the GBM model.
+In order to improve the accuracy of the single decision tree a little bit, we use the decision tree to approximate the GBM model (instead of training it on the original data).
 We train a decision tree with that data but the target variable is replaced by the predictions of GBM.
 The premise behind this, according to what a friend of me Armin Monecke told once, is that using predictions of 
 GBM (or other complex models) kind of removes the noise from the data, and makes it easier for less complex model (like single decision trees) to train.
 
 Additionally, here, we use only rows that are predicted with high confidence, i.e. probabilities close to 0 and 1. 
 
-Note: since we sample the data points, we need to take care of prior distribution (e.g. sampling with the same distribution of target column or specifying it for example using `prior` parameter in the algorithm).
+Note: since we sample the data points, we need to take care of prior distribution (e.g. sampling with the same distribution of target column or specifying it for example using a `prior` parameter in the algorithm).
 
 ```{r message=FALSE, warning=FALSE, results='hide'}
 denoise.h2o.df <- function(model, data_frame, destination_frame, lower.q=0.2, higher.q=0.8){

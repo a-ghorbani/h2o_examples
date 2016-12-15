@@ -42,13 +42,20 @@ rowVarImp.h2o  <-
     l <- get_high_rank_values(rankMat, valMat, cols, n)
     
     # bind all results
-    res <- cbind(l[[1]], l[[2]], l[[3]])
+    res <- cbind(
+      as.data.frame(l[[3]]),
+      as.data.frame(l[[2]]), 
+      as.data.frame(apply(l[[1]], 2, as.numeric))
+      )
     
     # give appropriate name to each column
     colNameC <-  paste0("colName_VI", c(1:n))
     colNameR <-  paste0("imp_VI", c(1:n))
     colNameV <-  paste0("value_VI", c(1:n))
-    colnames(res) <- c(colNameR, colNameV, colNameC)
+    colnames(res) <- c(colNameC, colNameV, colNameR )
+    
+    # re-arrange the columns
+    res = res[,c(sapply(c(1:n), function(x)(seq(x,n*2+x, n))))]
     
     return(res)
   } 
