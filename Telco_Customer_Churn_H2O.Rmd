@@ -16,12 +16,12 @@ output:
   
 The r-markdown file of this article (and some other useful examples) can be found here:  [https://github.com/a-ghorbani/h2o_examples](https://github.com/a-ghorbani/h2o_examples)
 
-You may also find a docker file in this repository, [Dockerfile](https://github.com/a-ghorbani/h2o_examples/blob/master/Dockerfile), which contains all the instructions that are necessary to run this example, like installing h2o, r-studio and all the r packages.
+You may also find a docker file in [here](https://github.com/a-ghorbani/docker-rstudio-h2o), which contains all the instructions that are necessary to run this example, like installing h2o, r-studio and all the r packages.
 
-You can pull the docker image from [here](), with running the following command: 
+You can pull the docker image from [here](https://hub.docker.com/r/aghorbani/rstudio-h2o/), with running the following command: 
 
 ```{bash eval=FALSE}
-> docker run -p 8787:8787 -p 54321:54321 -p 8080:8080 a-ghorbani/rstudio-h2o:7317
+> docker run -p 8787:8787 -p 54321:54321 -p 8080:8080 aghorbani/rstudio-h2o
 ```
 
 Then you should be able to browse to http://localhost:8787, where you can get a web based r-studio.
@@ -208,15 +208,19 @@ We can use Bayesian optimization to find out an approximation of the optimized h
 
 ## Bayesian Optimization
 
-H2O supports grid search and random search. Grid search is kind of brute force (it increases exponentially with the number of parameters) and random search is too crude. Though for many cases these approaches are sufficient, it is not known from prior whether that is sufficient.
+H2O supports grid search and random search. Grid search is kind of brute force (it increases exponentially with the number of parameters) and random search as its name suggests searches the hyper-parameter domain randomly.
 
-Bayesian optimization (BO) is used for automatic tuning of hyper-parameters. In this approach the information obtained from previous function evaluation (i.e. building and evaluating models using various hyper-parameters) is used to approximate best next hyper-parameters to be tried out.
+Bayesian optimization (BO) is used for automatic tuning of hyper-parameters. In this approach the information obtained from previous function evaluations (i.e. building and evaluating models using various hyper-parameters) is used to approximate best next hyper-parameters to be tried out.
 BO builds a probabilistic model for the objective function, which here is the performance of the model.
 For more information have a look [here](https://arxiv.org/pdf/1206.2944.pdf) and  [here](https://www.cs.ox.ac.uk/people/nando.defreitas/publications/BayesOptLoop.pdf).
 
 I wished H2O guys have implemented Bayesian optimization.
 But no worries. There are bunch of Bayesian optimization algorithms one can use, in R, Python, C++, etc.
 On the other hand the heavy lifting part, which is function evaluation (i.e. building the models), will be carried out by H2O.
+
+On the other hand there are some discussions whether BO worth the effort, e.g. see [here](https://people.eecs.berkeley.edu/~kjamieson/hyperband.html).
+Any ways I think at least it worth mentioning how we can combine BO with H2O.
+
 In the following it shall be shown how we can use `rBaysianOptimisation` package in R for finding the optimal hyper-parameters.
 
 The function `h2o_bayes` is defined as a wrapper for `h2o.gbm` function, which builds and evaluates a GBM model.
