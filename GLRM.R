@@ -56,7 +56,7 @@ data[,c.ord] <- as.data.frame(lapply(data[,c.ord], as.factor))
 # Convert to Boolean
 # 0, 1
 #=============================================================
-data[,c.bin] <- ( sign(data[,c.bin]) + 1 ) / 2  
+data[,c.bin] <-  ( sign(data[,c.bin]) + 1 ) / 2
 
 #=============================================================
 # Make part of data missing 
@@ -80,8 +80,8 @@ glrm.fit <- h2o.glrm(
   ignore_const_cols = FALSE,
   loss              = "Quadratic",
   multi_loss        = "Categorical", 
-  loss_by_col       = c(rep("Hinge",n3)),
-  loss_by_col_idx   = c(c.bin)-1,
+  #loss_by_col       = c(rep("Hinge",n3)),
+  #loss_by_col_idx   = c(c.bin)-1,
   regularization_x  = "Quadratic",
   regularization_y  = "Quadratic",
   gamma_x           = 0.01,

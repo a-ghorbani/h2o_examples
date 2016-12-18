@@ -8,7 +8,7 @@ source("plot_h2o_grid.R")
 #=============================================================
 # Init H2O (connect to a running H2O cluster)
 #=============================================================
-h2o.init(port = 54321, startH2O = FALSE)
+h2o.init(port = 54321)
 
 #=============================================================
 # Load data
@@ -75,7 +75,7 @@ dl.grid
 #=============================================================
 
 plotGridHistory(grid_id         = "dl.grid.search",
-                score           = "MSE",
+                score           = "rmse",
                 history_messure = "epochs", 
                 fname           = "dl_grid_search.pdf",
                 y_lim           = c(0,0.3),

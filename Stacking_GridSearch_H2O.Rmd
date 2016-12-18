@@ -16,7 +16,7 @@ require(scales)
 
 # Init H2O (connect to a running H2O cluster)
 ```{r, message=FALSE, warning=FALSE}
-h2o.init(port = 54321, startH2O = FALSE)
+h2o.init(port = 54321)
 h2o.removeAll()
 ```
 
